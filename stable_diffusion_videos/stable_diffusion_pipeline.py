@@ -271,8 +271,10 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        if (
+            callback_steps is None
+            or not isinstance(callback_steps, int)
+            or callback_steps <= 0
         ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
@@ -385,11 +387,11 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                     device=self.device,
                     dtype=latents_dtype,
                 )
-        else:
-            if latents.shape != latents_shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
+        elif latents.shape == latents_shape:
             latents = latents.to(self.device)
 
+        else:
+            raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
 
@@ -744,8 +746,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                     print(f"Skipping {save_path} because frames already exist")
                     continue
 
-                existing_frames = sorted(save_path.glob(f"*{image_file_ext}"))
-                if existing_frames:
+                if existing_frames := sorted(save_path.glob(f"*{image_file_ext}")):
                     skip = int(existing_frames[-1].stem[-6:]) + 1
                     if skip + 1 >= num_step:
                         print(f"Skipping {save_path} because frames already exist")
@@ -821,21 +822,20 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
 
     def init_noise(self, seed, noise_shape, dtype):
         """Helper to initialize noise"""
-        # randn does not exist on mps, so we create noise on CPU here and move it to the device after initialization
-        if self.device.type == "mps":
-            noise = torch.randn(
+        return (
+            torch.randn(
                 noise_shape,
                 device="cpu",
                 generator=torch.Generator(device="cpu").manual_seed(seed),
             ).to(self.device)
-        else:
-            noise = torch.randn(
+            if self.device.type == "mps"
+            else torch.randn(
                 noise_shape,
                 device=self.device,
                 generator=torch.Generator(device=self.device).manual_seed(seed),
                 dtype=dtype,
             )
-        return noise
+        )
 
     @classmethod
     def from_pretrained(cls, *args, tiled=False, **kwargs):

@@ -18,13 +18,12 @@ SAMPLES_DIR = Path(__file__).parent / "samples"
 
 @pytest.fixture
 def pipeline(scope="session"):
-    pipe = StableDiffusionWalkPipeline.from_pretrained(
+    return StableDiffusionWalkPipeline.from_pretrained(
         "CompVis/stable-diffusion-v1-4",
         torch_dtype=torch.float16,
         revision="fp16",
         safety_checker=None,
     ).to('cuda')
-    return pipe
 
 
 @pytest.fixture

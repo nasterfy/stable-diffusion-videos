@@ -87,7 +87,7 @@ class Interface:
         )
         if self.params is not None:
             # Assume Flax pipeline, force jit, params should be already replicated
-            kwargs.update(dict(params=self.params, jit=True))
+            kwargs |= dict(params=self.params, jit=True)
         return self.pipeline.walk(**kwargs)
 
     def fn_images(
@@ -123,7 +123,7 @@ class Interface:
         generate_images_fn = generate_images
         if self.params is not None:
             generate_images_fn = generate_images_flax
-            kwargs.update(dict(params=self.params))
+            kwargs |= dict(params=self.params)
 
         image_filepaths = generate_images_fn(**kwargs)
         return [(x, Path(x).stem) for x in sorted(image_filepaths)]
