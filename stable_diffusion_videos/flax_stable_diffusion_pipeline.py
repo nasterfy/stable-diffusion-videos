@@ -153,8 +153,7 @@ class FlaxStableDiffusionWalkPipeline(FlaxDiffusionPipeline):
         return text_input.input_ids
 
     def _get_has_nsfw_concepts(self, features, params):
-        has_nsfw_concepts = self.safety_checker(features, params)
-        return has_nsfw_concepts
+        return self.safety_checker(features, params)
 
     def _run_safety_checker(self, images, safety_model_params, jit=False):
         # safety_model_params should already be replicated when jit is True
@@ -524,17 +523,17 @@ class FlaxStableDiffusionWalkPipeline(FlaxDiffusionPipeline):
                 f"Unexpected T shape, got {T.shape}, expected dim 0 to be {num_interpolation_steps}"
             )
 
-        if upsample:
-            if getattr(self, "upsampler", None) is None:
+        if getattr(self, "upsampler", None) is None:
+            if upsample:
                 # TODO: port to flax
                 self.upsampler = RealESRGANModel.from_pretrained("nateraw/real-esrgan")
-                if not torch.cuda.is_available():
+                if torch.cuda.is_available():
+                    self.upsampler = self.upsampler.cuda()
+
+                else:
                     logger.warning(
                         "Upsampling is recommended to be done on a GPU, as it is very slow on CPU"
                     )
-                else:
-                    self.upsampler = self.upsampler.cuda()
-
         seed_a = jax.random.PRNGKey(seed_a)
         seed_b = jax.random.PRNGKey(seed_b)
 
@@ -795,8 +794,7 @@ class FlaxStableDiffusionWalkPipeline(FlaxDiffusionPipeline):
                     print(f"Skipping {save_path} because frames already exist")
                     continue
 
-                existing_frames = sorted(save_path.glob(f"*{image_file_ext}"))
-                if existing_frames:
+                if existing_frames := sorted(save_path.glob(f"*{image_file_ext}")):
                     skip = int(existing_frames[-1].stem[-6:]) + 1
                     if skip + 1 >= num_step:
                         print(f"Skipping {save_path} because frames already exist")
@@ -862,13 +860,11 @@ class FlaxStableDiffusionWalkPipeline(FlaxDiffusionPipeline):
     ):
         """Helper to embed some text"""
         prompt_ids = self.prepare_inputs(text)
-        embed = self.text_encoder(prompt_ids, params=params)[0]
-        return embed
+        return self.text_encoder(prompt_ids, params=params)[0]
 
     def init_noise(self, prng_seed, noise_shape, dtype):
         """Helper to initialize noise"""
-        noise = jax.random.normal(prng_seed, shape=noise_shape, dtype=dtype)
-        return noise
+        return jax.random.normal(prng_seed, shape=noise_shape, dtype=dtype)
 
     # TODO: port this behavior to flax
     # @classmethod
